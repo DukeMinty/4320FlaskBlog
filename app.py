@@ -19,6 +19,13 @@ def get_db_connection():
     #return the connection object
     return conn
 
+def get_post(post_id):
+    conn = get_db_connection()
+    post = conn.execute('SELECT * FROM posts WHERE id = ?', (post_id,)).fetchone()
+    conn.close()
+    if post is None:
+        abort(404)
+    return post
 
 # use the app.route() decorator to create a Flask view function called index()
 @app.route('/')
@@ -45,10 +52,32 @@ def create():
         else:
             conn = get_db_connection()
             conn.execute('INSERT INTO posts (title, content) VALUES (?, ?)', (title, content))
-            conn.commit()
-            conn.close()
+            commit_and_close(conn)
             return redirect(url_for('index'))
 
     return render_template('create.html')
+
+@app.route('/<int:id>/edit/', methods=('GET', 'POST'))
+def edit(id):
+    post = get_post(id)
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+
+        if not title:
+            flash('Title is required!')
+        elif not content:
+            flash('Content is required!')
+        else:
+            conn = get_db_connection()
+            conn.execute('UPDATE posts SET title = ?, content = ? WHERE id = ?', (title, content, id))
+            commit_and_close(conn)
+            return redirect(url_for('index'))
+
+    return render_template('edit.html', post=post)
+
+def commit_and_close(conn):
+    conn.commit()
+    conn.close()
 
 app.run()
